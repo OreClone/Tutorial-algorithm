@@ -1,0 +1,78 @@
+#ifndef VRP_BELLMAN_SPLIT_TOUR
+#define VRP_BELLMAN_SPLIT_TOUR
+
+#include "ProblemInstance.cpp"
+#include "TspProblem.cpp"
+#include "VrpSolution.cpp"
+
+namespace BellManSplitTour {
+    VrpSolution split(Tour tour) {
+        vector<int> V = tour.nodes;
+        V.pop_back();
+
+        vector<double> S_dist;
+        vector<int> S_wei;
+        S_dist.resize(V.size(), 0);
+        S_wei.resize(V.size(), 0);
+        for (int i = 0; i < (int) V.size(); ++i) {
+            S_dist[i] = (i == 0) ? 0 : S_dist[i-1] + VRP_INSTANCE.distances[V[i-1]][V[i]];
+            S_wei[i] = (i == 0) ? VRP_INSTANCE.demands[V[i]]: S_wei[i-1] + VRP_INSTANCE.demands[V[i]];
+        }
+
+        vector<double> dp;
+        vector<int> Trace;
+        dp.resize(V.size(), -1);
+        Trace.resize(V.size(), -1);
+        
+        deque<int> dq;
+        dq.push_back(-1);
+        
+        for (int i = 0; i < (int) V.size(); ++i) {
+            while ( dq.size() ) {
+                int val_j = ( dq.front() == -1 ) ? 0 : S_wei[dq.front()];
+                if ( S_wei[i] - val_j > VRP_INSTANCE.vehicleCapacity ) dq.pop_front();
+                else break;
+            }
+            assert( dq.size() );
+            
+            if (dq.front() == -1) {
+                dp[i] = VRP_INSTANCE.distances[0][V[0]] + VRP_INSTANCE.distances[V[i]][0] + S_dist[i];
+                Trace[i] = -1;
+            }
+            else {
+                int j = dq.front();
+                int val_j = dp[j] + VRP_INSTANCE.distances[0][V[j+1]] - S_dist[j+1];
+                dp[i] = val_j + VRP_INSTANCE.distances[V[i]][0] + S_dist[i];
+                Trace[i] = j; 
+            }
+
+            if ( i == (int) V.size() ) continue;
+            while ( dq.size() ) {
+                int j = dq.back();
+                int val_j = dp[j] + VRP_INSTANCE.distances[0][V[j+1]] - S_dist[j+1];
+                int val_i = dp[i] + VRP_INSTANCE.distances[0][V[i+1]] - S_dist[i+1];
+                if (val_i <= val_j) dq.pop_back();
+                else break;
+            }
+            dq.push_back(i);
+        }
+
+        VrpSolution vrp_tour;
+        int r = (int) V.size()-1;
+        while (r > 0) {
+            int l = Trace[r];
+
+            Tour tour;
+            tour.append(0);
+            for (int i = l+1; i <= r; ++i) tour.append(V[i]);
+            tour.append(0);
+
+            vrp_tour.tours.push_back(tour);
+            r = l;
+        }
+
+        return vrp_tour;
+    }
+}
+
+#endif // VRP_BELLMAN_SPLIT_TOUR
